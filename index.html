@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Secret Santa 2026</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: one narrow centered column; name grid → confirm step → gift tag reveal */
+/* Palette from the ornament photo: evergreen, moss, frost white, warm stone, slate.
+   Greens and greys differ strongly in lightness, so they stay distinct with any
+   type of color blindness, and no state relies on color alone. */
+:root {
+  --bg: #efefed;      /* frost white */
+  --surface: #fbfbfa;
+  --fg: #1d211d;      /* off-black */
+  --muted: #5c5e5d;   /* slate, darkened for readable text */
+  --line: #cdc7be;    /* warm stone */
+  --pine: #1e4b1d;    /* evergreen: primary actions, key numbers */
+  --berry: #456f30;   /* moss: secondary accent (name kept for the existing rules) */
+  --gold: #a39a8d;    /* stone trim on the gift tag */
+  --danger: #9e2a2b;  /* errors only, always with a text message */
+  --red: #b8292f;     /* festive decoration only; never the only way something is shown */
+  --tag: #fbfbfa;
+  --tag-ink: #1d211d;
+  --display: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --body: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.5; -webkit-text-size-adjust: 100%; position: relative; min-height: 100vh; overflow-x: hidden; }
+main {
+  position: relative; z-index: 1;
+  max-width: 520px; margin: 0 auto;
+  padding-block: 112px 180px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px;
+}
+header { display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--red); }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(36px, 9vw, 52px); line-height: 1; margin: 0; letter-spacing: -.02em; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 42ch; }
+
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.name {
+  font: 600 18px/1 var(--body); color: var(--fg); background: var(--surface);
+  border: 1.5px solid var(--line); border-radius: 6px; padding: 18px 16px;
+  text-align: left; cursor: pointer; text-transform: capitalize;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  transition: border-color .15s, transform .15s;
+}
+.name:hover { border-color: var(--pine); transform: translateY(-1px); }
+.name:focus-visible, .btn:focus-visible, .link:focus-visible { outline: 3px solid var(--pine); outline-offset: 2px; }
+.name .arrow { color: var(--muted); font-weight: 400; }
+.name.dim { opacity: .4; }
+.name.mine { border-color: var(--pine); }
+
+.panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+.panel h2 { font-family: var(--display); font-weight: 800; font-size: 28px; line-height: 1.1; margin: 0; text-transform: capitalize; }
+.panel p { margin: 0; color: var(--muted); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { font: 600 16px/1 var(--body); border-radius: 6px; padding: 14px 20px; cursor: pointer; border: 1.5px solid transparent; }
+.btn.primary { background: var(--pine); color: #fff; }
+.btn.ghost { background: transparent; color: var(--fg); border-color: var(--line); }
+.link { background: none; border: none; padding: 0; font: inherit; color: var(--muted); text-decoration: underline; cursor: pointer; align-self: flex-start; }
+
+/* gift tag */
+.tag-wrap { display: flex; justify-content: center; padding-top: 8px; }
+.tag {
+  position: relative; background: var(--tag); color: var(--tag-ink);
+  width: min(100%, 340px); padding: 40px 28px 30px 56px;
+  clip-path: polygon(28px 0, 100% 0, 100% 100%, 28px 100%, 0 50%);
+  filter: drop-shadow(0 0 1px rgba(28,27,25,.35)) drop-shadow(0 6px 14px rgba(28,27,25,.14));
+  animation: swing .9s cubic-bezier(.3,1.6,.5,1) both; transform-origin: 0 50%;
+}
+.tag::before { content: ""; position: absolute; left: 22px; top: 50%; width: 14px; height: 14px; margin-top: -7px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 2px var(--gold); }
+.tag .to { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; opacity: .7; }
+.tag .who { font-family: var(--display); font-weight: 800; font-size: clamp(38px, 11vw, 54px); line-height: 1.05; text-transform: capitalize; color: var(--red); margin-top: 6px; overflow-wrap: anywhere; }
+.tag .from { margin-top: 14px; font-size: 14px; }
+@keyframes swing { from { transform: rotate(-14deg); opacity: 0; } to { transform: rotate(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tag { animation: none; } .name { transition: none; } }
+
+footer { font-size: 13px; color: var(--muted); }
+.overlay {
+  position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
+  background: rgba(28,27,25,.55);
+  padding: calc(16px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  animation: fade .15s ease-out both;
+}
+.modal { width: min(100%, 420px); box-shadow: 0 18px 48px rgba(28,27,25,.3); animation: pop .2s ease-out both; }
+@keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+@media (prefers-reduced-motion: reduce) { .overlay, .modal { animation: none; } }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.countdown { margin: 0; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; }
+.cd-label { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--fg); }
+.cd-units { display: flex; gap: 14px; }
+.cd-unit { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cd-unit i { font-style: normal; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
+.flaps { display: flex; gap: 2px; }
+
+/* split-flap digit: static top/bottom halves plus two folding halves during a flip */
+.flap {
+  --h: 54px; --flap-hi: #ecebe7; --flap-lo: #e4e2dd;
+  position: relative; display: block; width: 38px; height: var(--h);
+  font-weight: 800; font-size: 36px; color: var(--fg); font-variant-numeric: tabular-nums;
+  border-radius: 4px; box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(28,27,25,.08);
+  perspective: 160px;
+}
+.flap .half { position: absolute; left: 0; right: 0; height: 50%; overflow: hidden; }
+.flap .top { top: 0; background: var(--flap-hi); border-radius: 4px 4px 0 0; transform-origin: bottom; }
+.flap .bottom { bottom: 0; background: var(--flap-lo); border-radius: 0 0 4px 4px; transform-origin: top; }
+.flap .half > span { position: absolute; left: 0; right: 0; height: var(--h); line-height: var(--h); text-align: center; }
+.flap .top > span { top: 0; }
+.flap .bottom > span { bottom: 0; }
+.flap::after { content: ""; position: absolute; left: 0; right: 0; top: calc(50% - .5px); height: 1px; background: rgba(28,27,25,.22); z-index: 4; }
+.flap .fold-top, .flap .fold-bottom { display: none; z-index: 3; backface-visibility: hidden; }
+.flap.flipping .fold-top { display: block; animation: foldTop .25s ease-in forwards; }
+.flap.flipping .fold-bottom { display: block; transform: rotateX(90deg); animation: foldBottom .25s .25s ease-out forwards; }
+@keyframes foldTop { to { transform: rotateX(-90deg); } }
+@keyframes foldBottom { to { transform: rotateX(0deg); } }
+.countdown.done .cd-units { display: none; }
+@media (max-width: 420px) { .cd-units { gap: 10px; } .flap { --h: 46px; width: 32px; font-size: 30px; } }
+.limit { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 14px; min-width: 0; background: var(--pine); color: var(--bg); border-radius: 6px; }
+.limit span { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--bg); opacity: .8; }
+.limit strong { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.1; color: var(--bg); font-variant-numeric: tabular-nums; }
+.tag .cap { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--gold); font-size: 14px; }
+.tag .cap strong { color: var(--pine); }
+
+/* wishlists (shown after the reveal) */
+.lists { margin: 28px auto 0; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.list-card { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.list-card.theirs { border-color: var(--berry); }
+.list-card h3 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 20px; line-height: 1.2; text-transform: capitalize; }
+.list-card ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.list-card li::marker { color: var(--berry); }
+.list-card .muted { margin: 0; font-size: 14px; color: var(--muted); }
+.list-card textarea { width: 100%; min-height: 130px; font: 16px/1.5 var(--body); color: var(--fg); background: var(--bg); border: 1.5px solid var(--line); border-radius: 6px; padding: 10px 12px; resize: vertical; }
+.list-card textarea:focus-visible { outline: 3px solid var(--pine); outline-offset: 1px; }
+.save-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.btn.green { background: var(--pine); color: #fff; }
+.btn:disabled { opacity: .55; cursor: default; }
+.status { font-size: 14px; color: var(--muted); }
+.status.err { color: var(--danger); font-weight: 600; }
+
+/* page decorations: drawn on canvases, never block clicks */
+.decor { position: absolute; left: 0; width: 100%; pointer-events: none; display: block; }
+#garland { top: 0; height: 100px; z-index: 2; }
+#trees { bottom: 0; height: 140px; z-index: 0; }
+#snow { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.name, .panel, .list-card { position: relative; }
+.name:hover { box-shadow: 0 2px 0 var(--line); }
+h1 .sparkle { color: var(--berry); }
+</style>
+</head>
+<body>
+<canvas id="snow" aria-hidden="true"></canvas>
+<canvas id="garland" class="decor" aria-hidden="true"></canvas>
+<canvas id="trees" class="decor" aria-hidden="true"></canvas>
+
+<main>
+  <header>
+    <span class="eyebrow">Secret Santa · 2026</span>
+    <h1>Who are you shopping for?</h1>
+    <p class="lede">Tap your own name to see who you drew. Keep it to yourself.</p>
+    <div class="facts">
+      <p class="limit"><span>Spending limit</span><strong>$40</strong></p>
+      <p class="limit date"><span>Gift exchange</span><strong>Thu, Dec 17</strong></p>
+    </div>
+    <div class="countdown" id="countdown" role="timer" aria-label="Countdown to the gift exchange on Thursday, December 17">
+      <span class="cd-label">Gift exchange in</span>
+      <div class="cd-units" aria-hidden="true">
+        <div class="cd-unit"><div class="flaps" id="cdD"></div><i>days</i></div>
+        <div class="cd-unit"><div class="flaps" id="cdH"></div><i>hrs</i></div>
+        <div class="cd-unit"><div class="flaps" id="cdM"></div><i>min</i></div>
+        <div class="cd-unit"><div class="flaps" id="cdS"></div><i>sec</i></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="pick" aria-label="Pick your name">
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <div id="confirm" class="overlay" hidden>
+    <div class="panel modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+      <h2 id="confirmTitle"></h2>
+      <p>Only reveal this if it's really you. Everyone else, look away.</p>
+      <div class="row">
+        <button class="btn primary" id="revealBtn" type="button">Yes, reveal my person</button>
+        <button class="btn ghost" id="backBtn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <section id="result" hidden aria-live="polite">
+    <div class="tag-wrap">
+      <div class="tag">
+        <div class="to">You're buying for</div>
+        <div class="who" id="who"></div>
+        <div class="from" id="from"></div>
+        <div class="cap">Keep it under <strong>$40</strong> · Bring it <strong>Thu, Dec 17</strong></div>
+      </div>
+    </div>
+    <div class="lists" id="lists">
+      <div class="list-card theirs">
+        <h3 id="theirTitle"></h3>
+        <div id="theirItems"><p class="muted">Loading…</p></div>
+      </div>
+      <div class="list-card">
+        <h3>Your wishlist</h3>
+        <p class="muted">One idea per line. Whoever drew you will see this.</p>
+        <label for="myList" class="muted" hidden>Your wishlist</label>
+        <textarea id="myList" maxlength="2000" placeholder="e.g. Wool socks, size L&#10;Any book by Ted Chiang&#10;Hot sauce sampler"></textarea>
+        <div class="save-row">
+          <button class="btn green" id="saveBtn" type="button">Save my wishlist</button>
+          <span class="status" id="saveStatus" role="status"></span>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:24px">
+      <button class="btn ghost" id="doneBtn" type="button">Hide it</button>
+    </div>
+  </section>
+
+  <section id="already" class="panel" hidden>
+    <h2 id="alreadyTitle"></h2>
+    <p>This device already looked up a name. Tap below to see yours again.</p>
+    <div class="row"><button class="btn primary" id="againBtn" type="button">Show my person</button></div>
+    <button class="link" id="resetBtn" type="button">Someone else is using this device</button>
+  </section>
+
+  <footer>The draw is fixed: everyone gives one gift and gets one, and nobody draws themselves.</footer>
+</main>
+
+<script>
+const DRAW = {"charles":"Ew0VFx4=","jayden":"AQANDAkLGQA=","gabe":"DQAbARkA","kathleen":"CAkVGgAAFg==","peter":"EwQGERcO","cam":"BAAPGQ==","jack":"CQAO","carter":"CQARHw=="};
+const NAMES = Object.keys(DRAW);
+const KEY = "ss2026-me";
+const $ = (id) => document.getElementById(id);
+
+function decode(giver) {
+  const raw = atob(DRAW[giver]);
+  const k = giver + "|north-pole-2026";
+  let out = "";
+  for (let i = 0; i < raw.length; i++) out += String.fromCharCode(raw.charCodeAt(i) ^ k.charCodeAt(i % k.length));
+  return out;
+}
+function getMe() { try { return localStorage.getItem(KEY); } catch { return null; } }
+function setMe(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} }
+
+let current = null;
+let lastFocus = null;
+function show(view) {
+  const modal = view === "confirm";
+  for (const id of ["pick", "result", "already"]) $(id).hidden = !(id === view || (modal && id === "pick"));
+  $("confirm").hidden = !modal;
+  if (modal) { lastFocus = document.activeElement; $("revealBtn").focus(); }
+  else if (lastFocus && view === "pick") { lastFocus = null; }
+}
+function closeModal() {
+  const back = lastFocus;
+  current = null; show("pick");
+  if (back && document.contains(back)) back.focus();
+}
+$("confirm").addEventListener("click", (e) => { if (e.target === $("confirm")) closeModal(); });
+document.addEventListener("keydown", (e) => {
+  if ($("confirm").hidden) return;
+  if (e.key === "Escape") closeModal();
+  if (e.key === "Tab") { // keep focus inside the modal
+    const a = $("revealBtn"), b = $("backBtn");
+    if (e.shiftKey && document.activeElement === a) { e.preventDefault(); b.focus(); }
+    else if (!e.shiftKey && document.activeElement === b) { e.preventDefault(); a.focus(); }
+  }
+});
+function renderGrid() {
+  const me = getMe();
+  const grid = $("grid");
+  grid.textContent = "";
+  for (const n of NAMES) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "name" + (me ? (n === me ? " mine" : " dim") : "");
+    b.innerHTML = `<span></span><span class="arrow" aria-hidden="true">→</span>`;
+    b.firstChild.textContent = n;
+    b.addEventListener("click", () => choose(n));
+    grid.appendChild(b);
+  }
+}
+function choose(n) {
+  const me = getMe();
+  if (me && me !== n) { $("alreadyTitle").textContent = "Hi, " + me; show("already"); return; }
+  current = n;
+  $("confirmTitle").textContent = "Are you " + n + "?";
+  show("confirm");
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function reveal(n) {
+  setMe(n);
+  const to = decode(n);
+  $("who").textContent = to;
+  $("from").textContent = "From: " + cap(n) + " (shh)";
+  showLists(n, to);
+  show("result");
+}
+
+/* ---------- Wishlists (Google Sheet via Apps Script) ---------- */
+// Paste your Apps Script web app URL here (see SETUP.md).
+const WISHLIST_URL = "https://script.google.com/macros/s/AKfycbxEo2EzMvxLL0OirY__nmmR_qH2GPM6wYXC2XBffU3LDU9CdK0ttJ9bxXt1HxD6IvQr/exec";
+
+let lists = {};       // { name: { items: [...], updated: "..." } }
+let shownFor = null;  // { me, to } while the result screen is open
+
+async function fetchLists() {
+  const res = await fetch(WISHLIST_URL + "?t=" + Date.now());
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return data.lists || {};
+}
+function renderTheirs() {
+  if (!shownFor) return;
+  const box = $("theirItems");
+  box.textContent = "";
+  const items = (lists[shownFor.to] && lists[shownFor.to].items) || [];
+  if (!items.length) {
+    const p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = cap(shownFor.to) + " hasn't added a wishlist yet. Check back later.";
+    box.appendChild(p);
+    return;
+  }
+  const ul = document.createElement("ul");
+  for (const it of items) { const li = document.createElement("li"); li.textContent = it; ul.appendChild(li); }
+  box.appendChild(ul);
+}
+async function showLists(me, to) {
+  shownFor = { me, to };
+  $("theirTitle").textContent = cap(to) + "'s wishlist";
+  $("saveStatus").textContent = ""; $("saveStatus").className = "status";
+  if (!WISHLIST_URL) {
+    $("theirItems").innerHTML = '<p class="muted">Wishlists aren\'t switched on yet.</p>';
+    $("myList").disabled = true; $("saveBtn").disabled = true;
+    return;
+  }
+  $("myList").disabled = false; $("saveBtn").disabled = false;
+  $("myList").value = ((lists[me] && lists[me].items) || []).join("\n");
+  renderTheirs();
+  try {
+    lists = await fetchLists();
+    if (!shownFor || shownFor.me !== me) return;
+    if (!$("myList").dataset.dirty) $("myList").value = ((lists[me] && lists[me].items) || []).join("\n");
+    renderTheirs();
+  } catch {
+    $("theirItems").innerHTML = '<p class="muted">Couldn\'t load wishlists. Check your connection and reopen this page.</p>';
+  }
+}
+$("myList").addEventListener("input", () => { $("myList").dataset.dirty = "1"; $("saveStatus").textContent = ""; });
+$("saveBtn").addEventListener("click", async () => {
+  if (!shownFor || !WISHLIST_URL) return;
+  const me = shownFor.me;
+  const items = $("myList").value.split("\n").map(s => s.trim()).filter(Boolean).slice(0, 20).map(s => s.slice(0, 200));
+  const st = $("saveStatus");
+  $("saveBtn").disabled = true; st.className = "status"; st.textContent = "Saving…";
+  try {
+    const res = await fetch(WISHLIST_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // plain text avoids a CORS preflight
+      body: JSON.stringify({ name: me, items })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Save failed");
+    lists[me] = { items, updated: new Date().toISOString() };
+    delete $("myList").dataset.dirty;
+    $("myList").value = items.join("\n");
+    st.textContent = "Saved ✓";
+  } catch {
+    st.className = "status err";
+    st.textContent = "Didn't save. Check your connection and try again.";
+  } finally {
+    $("saveBtn").disabled = false;
+  }
+});
+
+$("revealBtn").addEventListener("click", () => reveal(current));
+$("backBtn").addEventListener("click", closeModal);
+$("doneBtn").addEventListener("click", () => {
+  $("who").textContent = ""; $("theirItems").textContent = ""; $("myList").value = "";
+  delete $("myList").dataset.dirty; shownFor = null;
+  renderGrid(); show("pick");
+});
+$("againBtn").addEventListener("click", () => reveal(getMe()));
+$("resetBtn").addEventListener("click", () => { setMe(null); renderGrid(); show("pick"); });
+
+// Live countdown to the gift exchange: midnight at the start of Dec 17, viewer's local time.
+const EXCHANGE_AT = new Date(2026, 11, 17, 0, 0, 0);
+function tick() {
+  const ms = EXCHANGE_AT - Date.now();
+  if (ms <= 0) {
+    $("countdown").classList.add("done");
+    $("countdown").querySelector(".cd-label").textContent = "It's gift exchange day!";
+    return false;
+  }
+  const sec = Math.floor(ms / 1000);
+  setFlaps("cdD", Math.floor(sec / 86400));
+  setFlaps("cdH", Math.floor(sec / 3600) % 24);
+  setFlaps("cdM", Math.floor(sec / 60) % 60);
+  setFlaps("cdS", sec % 60);
+  return true;
+}
+
+// Split-flap digits
+const REDUCE_MOTION = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+function makeFlap() {
+  const el = document.createElement("span");
+  el.className = "flap";
+  el.innerHTML = '<span class="half top"><span></span></span><span class="half bottom"><span></span></span>' +
+                 '<span class="half top fold-top"><span></span></span><span class="half bottom fold-bottom"><span></span></span>';
+  el.dataset.v = "";
+  return el;
+}
+function setFlap(el, v) {
+  const old = el.dataset.v;
+  if (old === v) return;
+  el.dataset.v = v;
+  const [top, bottom, foldTop, foldBottom] = el.children;
+  top.firstChild.textContent = v;          // new top half sits underneath the falling flap
+  foldBottom.firstChild.textContent = v;   // new bottom half swings down into place
+  if (!old || REDUCE_MOTION) { bottom.firstChild.textContent = v; return; }
+  foldTop.firstChild.textContent = old;    // old top half falls away
+  bottom.firstChild.textContent = old;     // old bottom half stays until covered
+  el.classList.remove("flipping");
+  void el.offsetWidth;                     // restart the animation
+  el.classList.add("flipping");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { bottom.firstChild.textContent = v; el.classList.remove("flipping"); }, 520);
+}
+function setFlaps(id, n) {
+  const box = $(id);
+  const digits = String(n).padStart(2, "0").split("");
+  while (box.children.length < digits.length) box.appendChild(makeFlap());
+  while (box.children.length > digits.length) box.removeChild(box.firstChild);
+  digits.forEach((d, i) => setFlap(box.children[i], d));
+}
+if (tick()) {
+  const timer = setInterval(() => { if (!tick()) clearInterval(timer); }, 1000);
+}
+
+renderGrid();
+show("pick");
+</script>
+
+<script>
+/* ---------- Decorations: garland + baubles, snowfall, snowy pines ---------- */
+(function () {
+  const C = { ever: "#1e4b1d", ever2: "#245722", moss: "#456f30", moss2: "#5a8a3f",
+              frost: "#f7f7f5", stone: "#a39a8d", slate: "#8e8f91", ink: "#1d211d", red: "#b8292f", red2: "#d0393b" };
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function rng(seed) { // small seeded random so the garland looks the same on every redraw
+    return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  function fit(cv) {
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h };
+  }
+
+  function bauble(ctx, x, y, r, fill, rim) {
+    ctx.fillStyle = C.stone; ctx.fillRect(x - r * 0.35, y - r - 4, r * 0.7, 5);           // cap
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
+    if (rim) { ctx.strokeStyle = rim; ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.35, r * 0.28, 0, Math.PI * 2);    // shine
+    ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fill();
+    ctx.strokeStyle = "rgba(29,33,29,.12)"; ctx.lineWidth = 1;                          // a band
+    ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  function drawGarland() {
+    const { ctx, w } = fit(document.getElementById("garland"));
+    const r = rng(17);
+    const n = Math.max(3, Math.round(w / 210)), S = w / n, sag = 26, top = 10;
+    const yAt = (x) => { const t = (x % S) / S; return top + sag * 4 * t * (1 - t); };
+    const greens = [C.ever, C.ever2, C.moss, C.ever, C.moss2];
+    ctx.lineCap = "round";
+    for (let pass = 0; pass < 2; pass++) {
+      for (let x = -6; x <= w + 6; x += pass ? 2.2 : 3) {
+        const y = yAt(Math.max(0, x));
+        for (let k = 0; k < 3; k++) {
+          const a = r() * Math.PI * 2, len = 6 + r() * 9;
+          ctx.strokeStyle = greens[(r() * greens.length) | 0];
+          ctx.globalAlpha = pass ? 1 : 0.6;
+          ctx.lineWidth = pass ? 1.4 : 2;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len * 0.8); ctx.stroke();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+    // holly berry clusters along the garland
+    for (let x = 22; x < w; x += 38 + r() * 22) {
+      const y = yAt(x) + 2;
+      for (let b = 0; b < 3; b++) {
+        ctx.beginPath(); ctx.arc(x + (b - 1) * 3.6, y + (b === 1 ? -2.6 : 0.8), 2.6, 0, Math.PI * 2);
+        ctx.fillStyle = b === 1 ? C.red2 : C.red; ctx.fill();
+      }
+    }
+    const fills = [[C.red, null], [C.frost, C.stone], [C.slate, null], [C.red, null], [C.moss, null], [C.frost, C.stone]];
+    for (let i = 0; i < n; i++) {
+      const cx = i * S + S / 2, y0 = yAt(cx);
+      const drop = 14 + (i % 3) * 12, rad = 9 + (i % 2) * 3;
+      ctx.strokeStyle = C.stone; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, y0 + drop); ctx.stroke();
+      const [f, rim] = fills[i % fills.length];
+      bauble(ctx, cx, y0 + drop + rad + 4, rad, f, rim);
+      // red bow at each swag peak
+      const px = i * S;
+      if (px > 0) {
+        const by = top + 4;
+        ctx.fillStyle = C.red;
+        ctx.beginPath(); ctx.moveTo(px, by); ctx.lineTo(px - 11, by - 7); ctx.lineTo(px - 11, by + 7); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(px, by); ctx.lineTo(px + 11, by - 7); ctx.lineTo(px + 11, by + 7); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(px - 2, by); ctx.lineTo(px - 7, by + 15); ctx.lineTo(px - 3, by + 14); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(px + 2, by); ctx.lineTo(px + 7, by + 15); ctx.lineTo(px + 3, by + 14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = C.red2; ctx.beginPath(); ctx.arc(px, by, 3.4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+  }
+
+  function tree(ctx, x, base, h, col, capCol) {
+    const tiers = 3, w = h * 0.62;
+    ctx.fillStyle = "#5b4630"; ctx.fillRect(x - h * 0.04, base - h * 0.1, h * 0.08, h * 0.1);   // trunk
+    for (let i = 0; i < tiers; i++) {
+      const tb = base - h * 0.08 - i * h * 0.25, tw = w * (1 - i * 0.24), th = h * 0.42;
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(x - tw / 2, tb); ctx.lineTo(x + tw / 2, tb); ctx.lineTo(x, tb - th); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = capCol;                                                                     // snow on each tier
+      ctx.beginPath(); ctx.moveTo(x - tw * 0.16, tb - th * 0.68); ctx.lineTo(x + tw * 0.16, tb - th * 0.68); ctx.lineTo(x, tb - th); ctx.closePath(); ctx.fill();
+    }
+    // a few red ornaments on each tree
+    ctx.fillStyle = C.red;
+    const dots = [[-0.18, 0.2], [0.14, 0.32], [-0.06, 0.48], [0.1, 0.62]];
+    for (const [dx, dy] of dots) {
+      ctx.beginPath(); ctx.arc(x + dx * w, base - h * dy, Math.max(1.8, h * 0.028), 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  function drawTrees() {
+    const { ctx, w, h } = fit(document.getElementById("trees"));
+    const r = rng(42), ground = h - 22;
+    const cols = [C.ever, C.ever2, C.moss, C.ever];
+    let x = 10 + r() * 30;
+    const list = [];
+    while (x < w + 30) { list.push([x, 50 + r() * 70, cols[(r() * cols.length) | 0]]); x += 34 + r() * 46; }
+    list.sort((a, b) => a[1] - b[1]).forEach(([tx, th, c]) => tree(ctx, tx, ground + 4, th, c, C.frost));
+    ctx.fillStyle = C.frost;                                                                      // snowbank
+    ctx.beginPath(); ctx.moveTo(0, h);
+    for (let gx = 0; gx <= w; gx += 20) ctx.lineTo(gx, ground + Math.sin(gx / 37) * 4);
+    ctx.lineTo(w, h); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(163,154,141,.6)"; ctx.lineWidth = 1;
+    ctx.beginPath(); for (let gx = 0; gx <= w; gx += 20) ctx.lineTo(gx, ground + Math.sin(gx / 37) * 4); ctx.stroke();
+  }
+
+  // snowfall
+  const snowCv = document.getElementById("snow");
+  let snow = { ctx: null, w: 0, h: 0 }, flakes = [];
+  function setupSnow() {
+    snow = fit(snowCv);
+    const n = Math.min(110, Math.round(snow.w * snow.h / 11000));
+    flakes = Array.from({ length: n }, () => ({
+      x: Math.random() * snow.w, y: Math.random() * snow.h, r: 1 + Math.random() * 2.4,
+      vy: 0.25 + Math.random() * 0.7, ph: Math.random() * 6.28, a: 0.35 + Math.random() * 0.45 }));
+  }
+  function drawSnow(t) {
+    const { ctx, w, h } = snow;
+    ctx.clearRect(0, 0, w, h);
+    for (const f of flakes) {
+      if (!reduce) { f.y += f.vy; f.x += Math.sin(t / 1400 + f.ph) * 0.35; if (f.y > h + 4) { f.y = -4; f.x = Math.random() * w; } }
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(142,143,145," + f.a + ")"; ctx.fill();
+    }
+    if (!reduce) requestAnimationFrame(drawSnow);
+  }
+
+  function drawAll() { drawGarland(); drawTrees(); setupSnow(); if (reduce) drawSnow(0); }
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawAll, 150); });
+  drawAll();
+  if (!reduce) requestAnimationFrame(drawSnow);
+})();
+</script>
+</body>
+</html>
