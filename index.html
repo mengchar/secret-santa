@@ -149,7 +149,12 @@ footer { font-size: 13px; color: var(--muted); }
 
 /* page decorations: drawn on canvases, never block clicks */
 .decor { position: absolute; left: 0; width: 100%; pointer-events: none; display: block; }
-#garland { top: 0; height: 100px; z-index: 2; }
+#garland { top: 0; height: 100px; z-index: 0; }
+.modal h2 { text-transform: none; }
+.title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.title-row h1 { min-width: 0; }
+.snowman { flex: none; width: clamp(64px, 19vw, 100px); height: auto; margin-bottom: -6px; }
+.modal .row .btn { flex: 1 1 auto; }
 #trees { bottom: 0; height: 140px; z-index: 0; }
 #snow { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 .name, .panel, .list-card { position: relative; }
@@ -165,7 +170,32 @@ h1 .sparkle { color: var(--berry); }
 <main>
   <header>
     <span class="eyebrow">Secret Santa · 2026</span>
-    <h1>Who are you shopping for?</h1>
+    <div class="title-row">
+      <h1>Who are you shopping for?</h1>
+      <svg class="snowman" viewBox="0 -12 100 142" aria-hidden="true" focusable="false">
+        <ellipse cx="50" cy="125" rx="36" ry="5" fill="rgba(29,33,29,.08)"/>
+        <line x1="33" y1="56" x2="10" y2="40" stroke="#6b4e2e" stroke-width="2.6" stroke-linecap="round"/>
+        <line x1="17" y1="45" x2="14" y2="35" stroke="#6b4e2e" stroke-width="2" stroke-linecap="round"/>
+        <line x1="67" y1="56" x2="90" y2="42" stroke="#6b4e2e" stroke-width="2.6" stroke-linecap="round"/>
+        <line x1="83" y1="46" x2="88" y2="36" stroke="#6b4e2e" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="50" cy="96" r="28" fill="#fbfbfa" stroke="#cdc7be" stroke-width="2"/>
+        <circle cx="50" cy="58" r="20" fill="#fbfbfa" stroke="#cdc7be" stroke-width="2"/>
+        <circle cx="50" cy="28" r="15" fill="#fbfbfa" stroke="#cdc7be" stroke-width="2"/>
+        <rect x="31" y="11" width="38" height="5" rx="2" fill="#1e4b1d"/>
+        <rect x="38" y="-9" width="24" height="21" rx="2" fill="#1e4b1d"/>
+        <rect x="38" y="5" width="24" height="4" fill="#b8292f"/>
+        <circle cx="45" cy="25" r="1.9" fill="#1d211d"/>
+        <circle cx="55" cy="25" r="1.9" fill="#1d211d"/>
+        <polygon points="50,29 65,32 50,33" fill="#e07b2a"/>
+        <circle cx="44" cy="35" r="1" fill="#1d211d"/><circle cx="48" cy="36.6" r="1" fill="#1d211d"/>
+        <circle cx="52" cy="36.6" r="1" fill="#1d211d"/><circle cx="56" cy="35" r="1" fill="#1d211d"/>
+        <rect x="34" y="40" width="32" height="7" rx="3" fill="#b8292f"/>
+        <rect x="56" y="44" width="8" height="19" rx="2" fill="#b8292f" transform="rotate(-10 60 44)"/>
+        <circle cx="50" cy="53" r="2.1" fill="#1d211d"/>
+        <circle cx="50" cy="61" r="2.1" fill="#1d211d"/>
+        <circle cx="50" cy="69" r="2.1" fill="#1d211d"/>
+      </svg>
+    </div>
     <p class="lede">Tap your own name to see who you drew. Keep it to yourself.</p>
     <div class="facts">
       <p class="limit"><span>Spending limit</span><strong>$40</strong></p>
@@ -267,6 +297,7 @@ function closeModal() {
   current = null; show("pick");
   if (back && document.contains(back)) back.focus();
 }
+document.body.appendChild($("confirm")); // lift the pop-up above the page decorations
 $("confirm").addEventListener("click", (e) => { if (e.target === $("confirm")) closeModal(); });
 document.addEventListener("keydown", (e) => {
   if ($("confirm").hidden) return;
@@ -295,7 +326,7 @@ function choose(n) {
   const me = getMe();
   if (me && me !== n) { $("alreadyTitle").textContent = "Hi, " + me; show("already"); return; }
   current = n;
-  $("confirmTitle").textContent = "Are you " + n + "?";
+  $("confirmTitle").textContent = "Are you " + cap(n) + "?";
   show("confirm");
 }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -306,6 +337,9 @@ function reveal(n) {
   $("from").textContent = "From: " + cap(n) + " (shh)";
   showLists(n, to);
   show("result");
+  // on phones the tag starts below the fold: bring it into view
+  const top = $("result").getBoundingClientRect().top + scrollY - 16;
+  if (top > scrollY + innerHeight * 0.5) scrollTo({ top, behavior: REDUCE_MOTION ? "auto" : "smooth" });
 }
 
 /* ---------- Wishlists (Google Sheet via Apps Script) ---------- */
