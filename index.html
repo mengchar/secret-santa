@@ -363,7 +363,7 @@ function renderGrid() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "name gift v" + [0, 1, 3, 2, 2, 3, 1, 0][i % 8] + (me ? (n === me ? " mine" : " dim") : "");
-    b.innerHTML = `<span></span><span class="arrow" aria-hidden="true">→</span>` +
+    b.innerHTML = `<span></span>` +
       (SOCKS[i] || `<span class="wrap" aria-hidden="true"><span class="ribbon"></span></span>` + BOW);  // a stocking replaces the ribbon on some tiles
     if (SOCKS[i]) b.classList.add("has-sock");
     b.firstChild.textContent = n;
