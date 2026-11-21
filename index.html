@@ -58,6 +58,8 @@ h1 { font-family: var(--display); font-weight: 800; font-size: clamp(36px, 9vw, 
 .name:focus-visible, .btn:focus-visible, .link:focus-visible { outline: 3px solid var(--pine); outline-offset: 2px; }
 .name .arrow { color: var(--muted); font-weight: 400; }
 .name.dim { opacity: .4; }
+.check-status { margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 600; color: var(--muted); }
+.name .seen { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 8px; border-radius: 50%; background: var(--pine); color: #fff; font-size: 11px; line-height: 1; vertical-align: 2px; }
 .name.mine { border-color: var(--pine); }
 
 .panel { background: var(--surface); border: 1.5px solid var(--line); border-radius: 8px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
@@ -249,6 +251,7 @@ h1 .sparkle { color: var(--berry); }
   </header>
 
   <section id="pick" aria-label="Pick your name">
+    <p class="check-status" id="checkStatus" role="status" hidden></p>
     <div class="grid" id="grid"></div>
   </section>
 
@@ -367,6 +370,10 @@ function renderGrid() {
       (SOCKS[i] || `<span class="wrap" aria-hidden="true"><span class="ribbon"></span></span>` + BOW);  // a stocking replaces the ribbon on some tiles
     if (SOCKS[i]) b.classList.add("has-sock");
     b.firstChild.textContent = n;
+    if (checked && checked[n]) {
+      b.firstChild.insertAdjacentHTML("beforeend", '<span class="seen" aria-hidden="true">✓</span>');
+      b.setAttribute("aria-label", n + ", has checked their match");
+    }
     b.addEventListener("click", () => choose(n));
     grid.appendChild(b);
   });
@@ -385,6 +392,7 @@ function reveal(n) {
   $("who").textContent = to;
   $("from").textContent = "From: " + cap(n) + " (shh)";
   showLists(n, to);
+  checkIn(n);
   show("result");
   // on phones the tag starts below the fold: bring it into view
   const top = $("result").getBoundingClientRect().top + scrollY - 16;
@@ -397,12 +405,40 @@ const WISHLIST_URL = "https://script.google.com/macros/s/AKfycbxEo2EzMvxLL0OirY_
 
 let lists = {};       // { name: { items: [...], updated: "..." } }
 let shownFor = null;  // { me, to } while the result screen is open
+let checked = null;   // { name: firstCheckedTime } once the script reports check-ins; null = not available yet
 
 async function fetchLists() {
   const res = await fetch(WISHLIST_URL + "?t=" + Date.now());
   if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
+  if (data.checked) { checked = data.checked; renderCheckins(); }
   return data.lists || {};
+}
+
+/* ---------- Check-ins: records only that a person revealed, never who they drew ---------- */
+function renderCheckins() {
+  const st = $("checkStatus");
+  if (!checked) { st.hidden = true; return; }
+  const count = NAMES.filter(n => checked[n]).length;
+  st.hidden = false;
+  st.textContent = count === NAMES.length
+    ? "Everyone has checked their match."
+    : count + " of " + NAMES.length + " have checked their match";
+  renderGrid();
+}
+async function checkIn(n) {
+  if (!WISHLIST_URL) return;
+  try {
+    if (!checked) lists = await fetchLists();
+    // Only send once the updated Google script is live: the old one would treat this as an empty wishlist save.
+    if (!checked || checked[n]) return;
+    const res = await fetch(WISHLIST_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "checkin", name: n })
+    });
+    if ((await res.json()).ok) { checked[n] = new Date().toISOString(); renderCheckins(); }
+  } catch { /* a missed check-in is harmless; it is retried on the next reveal */ }
 }
 function renderTheirs() {
   if (!shownFor) return;
@@ -533,6 +569,8 @@ if (tick()) {
 }
 
 renderGrid();
+// Load wishlists and the check-in count on page open.
+if (WISHLIST_URL) fetchLists().then((l) => { lists = l; }).catch(() => {});
 show("pick");
 </script>
 

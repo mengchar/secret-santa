@@ -14,6 +14,14 @@
 
 If you later edit the script, use **Deploy → Manage deployments → Edit → New version** so the URL stays the same.
 
+### Updating the script (e.g. to turn on check-in tracking)
+
+1. Open the sheet → **Extensions → Apps Script**.
+2. Select all the code, delete it, paste in the new `wishlist-apps-script.gs`, and save.
+3. **Deploy → Manage deployments**, click the pencil (Edit), set Version to **New version**, click **Deploy**.
+
+The URL doesn't change. Check-ins then appear in a new **Checked** tab: each person's name and when they first and last revealed. It never records who they drew. Until the script is updated, the page simply doesn't send check-ins.
+
 ## 2. GitHub Pages
 
 1. Create a repo and add `index.html` (the other two files are optional).
@@ -25,3 +33,4 @@ If you later edit the script, use **Deploy → Manage deployments → Edit → N
 - The draw is baked into `index.html` (scrambled, not encrypted). Anyone determined enough to dig through the code could decode it, so it's an honor system.
 - Anyone with the page link can edit any person's wishlist. Also honor system.
 - The wishlists sit in your Google Sheet, so you can see them there. You can't see the draw there.
+- Check-ins record that a name was revealed on some device, not that the right person did it.
