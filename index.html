@@ -147,6 +147,10 @@ footer { font-size: 13px; color: var(--muted); }
 .save-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .btn.green { background: var(--pine); color: #fff; }
 .btn:disabled { opacity: .55; cursor: default; }
+.updated-tag { display: inline-block; margin-left: 4px; padding: 3px 8px; border-radius: 4px; background: var(--pine); color: var(--bg); font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: .02em; line-height: 1.4; text-transform: none; vertical-align: 3px; white-space: nowrap; }
+.new-pill { display: inline-block; margin-left: 4px; padding: 1px 7px; border-radius: 4px; background: var(--pine); color: var(--bg); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; line-height: 1.5; vertical-align: 1px; }
+.list-card .removed-note { font-style: italic; }
+.update-banner { margin: 0 auto 12px; max-width: 520px; padding: 10px 14px; border-radius: 6px; background: var(--pine); color: var(--bg); font-size: 14px; font-weight: 600; line-height: 1.4; text-align: center; }
 .status { font-size: 14px; color: var(--muted); }
 .status.err { color: var(--danger); font-weight: 600; }
 
@@ -251,6 +255,7 @@ h1 .sparkle { color: var(--berry); }
   </header>
 
   <section id="pick" aria-label="Pick your name">
+    <p class="update-banner" id="updateBanner" role="status" hidden>Your person updated their wishlist. Tap your name to see what's new.</p>
     <p class="check-status" id="checkStatus" role="status" hidden></p>
     <div class="grid" id="grid"></div>
   </section>
@@ -388,6 +393,7 @@ function choose(n) {
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 function reveal(n) {
   setMe(n);
+  $("updateBanner").hidden = true; // they're about to see the list itself
   const to = decode(n);
   $("who").textContent = to;
   $("from").textContent = "From: " + cap(n) + " (shh)";
@@ -440,21 +446,83 @@ async function checkIn(n) {
     if ((await res.json()).ok) { checked[n] = new Date().toISOString(); renderCheckins(); }
   } catch { /* a missed check-in is harmless; it is retried on the next reveal */ }
 }
+/* ---------- "Updated since you last looked": all on this device, nothing sent anywhere ---------- */
+// ss2026-seen = { who: short fingerprint of the recipient (never the name), items: [...], seenAt }
+const SEEN_KEY = "ss2026-seen";
+function getSeen() { try { return JSON.parse(localStorage.getItem(SEEN_KEY)); } catch { return null; } }
+function setSeen(v) { try { v ? localStorage.setItem(SEEN_KEY, JSON.stringify(v)) : localStorage.removeItem(SEEN_KEY); } catch {} }
+function fingerprint(name) { // FNV-1a, only used to notice a re-randomized draw
+  let h = 0x811c9dc5;
+  for (const ch of name + "|seen-2026") { h ^= ch.charCodeAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h.toString(16).padStart(8, "0");
+}
+const norm = (s) => String(s).trim().toLowerCase();
+function itemsOf(name) { return (lists[name] && lists[name].items) || []; }
+// The snapshot as it was when this visit started, so badges stay up for the whole visit.
+// undefined = not read yet; null = no usable snapshot (first look: no badges).
+let baseline;
+function loadBaseline(to) {
+  if (baseline !== undefined) return;
+  const s = getSeen();
+  baseline = s && s.who === fingerprint(to) && Array.isArray(s.items) ? s.items : null;
+}
+function diffFor(to) { // { added: Set of normalized items, removed: count } or null when nothing changed
+  loadBaseline(to);
+  if (!baseline) return null;
+  const before = new Set(baseline.map(norm)), now = new Set(itemsOf(to).map(norm));
+  const added = new Set([...now].filter((x) => !before.has(x)));
+  const removed = [...before].filter((x) => !now.has(x)).length;
+  return added.size || removed ? { added, removed } : null;
+}
+function saveSeen(to) { setSeen({ who: fingerprint(to), items: itemsOf(to), seenAt: new Date().toISOString() }); }
+function renderUpdateBanner() {
+  const me = getMe(), b = $("updateBanner");
+  if (!me || !NAMES.includes(me) || shownFor) { b.hidden = true; return; }
+  const to = decode(me);
+  const changed = diffFor(to);
+  if (!baseline) saveSeen(to); // first look on this device: remember it, show nothing
+  b.hidden = !changed;
+}
+function clearSeen() { setSeen(null); baseline = undefined; $("updateBanner").hidden = true; }
+
 function renderTheirs() {
   if (!shownFor) return;
   const box = $("theirItems");
   box.textContent = "";
-  const items = (lists[shownFor.to] && lists[shownFor.to].items) || [];
+  const to = shownFor.to, items = itemsOf(to), changed = diffFor(to);
+  $("theirTitle").textContent = cap(to) + "'s wishlist";
+  if (changed) {
+    const tag = document.createElement("span");
+    tag.className = "updated-tag";
+    tag.textContent = "Updated since you last looked";
+    $("theirTitle").append(" ", tag);
+  }
   if (!items.length) {
     const p = document.createElement("p");
     p.className = "muted";
-    p.textContent = cap(shownFor.to) + " hasn't added a wishlist yet. Check back later.";
+    p.textContent = cap(to) + " hasn't added a wishlist yet. Check back later.";
     box.appendChild(p);
-    return;
+  } else {
+    const ul = document.createElement("ul");
+    for (const it of items) {
+      const li = document.createElement("li");
+      li.textContent = it;
+      if (changed && changed.added.has(norm(it))) {
+        const pill = document.createElement("span");
+        pill.className = "new-pill";
+        pill.textContent = "New";
+        li.append(" ", pill);
+      }
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
   }
-  const ul = document.createElement("ul");
-  for (const it of items) { const li = document.createElement("li"); li.textContent = it; ul.appendChild(li); }
-  box.appendChild(ul);
+  if (changed && changed.removed) {
+    const p = document.createElement("p");
+    p.className = "muted removed-note";
+    p.textContent = changed.removed + (changed.removed === 1 ? " item removed" : " items removed");
+    box.appendChild(p);
+  }
 }
 async function showLists(me, to) {
   shownFor = { me, to };
@@ -473,6 +541,7 @@ async function showLists(me, to) {
     if (!shownFor || shownFor.me !== me) return;
     if (!$("myList").dataset.dirty) $("myList").value = ((lists[me] && lists[me].items) || []).join("\n");
     renderTheirs();
+    saveSeen(to); // they've now seen the fresh list; badges on screen stay until the next visit
   } catch {
     $("theirItems").innerHTML = '<p class="muted">Couldn\'t load wishlists. Check your connection and reopen this page.</p>';
   }
@@ -512,7 +581,7 @@ $("doneBtn").addEventListener("click", () => {
   renderGrid(); show("pick");
 });
 $("againBtn").addEventListener("click", () => reveal(getMe()));
-$("resetBtn").addEventListener("click", () => { setMe(null); renderGrid(); show("pick"); });
+$("resetBtn").addEventListener("click", () => { setMe(null); clearSeen(); renderGrid(); show("pick"); });
 
 // Live countdown to the gift exchange: midnight at the start of Dec 17, viewer's local time.
 const EXCHANGE_AT = new Date(2026, 11, 17, 0, 0, 0);
@@ -570,7 +639,7 @@ if (tick()) {
 
 renderGrid();
 // Load wishlists and the check-in count on page open.
-if (WISHLIST_URL) fetchLists().then((l) => { lists = l; }).catch(() => {});
+if (WISHLIST_URL) fetchLists().then((l) => { lists = l; renderUpdateBanner(); }).catch(() => {});
 show("pick");
 </script>
 
